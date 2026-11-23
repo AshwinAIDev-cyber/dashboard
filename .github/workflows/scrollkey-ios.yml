@@ -1,0 +1,99 @@
+name: Scrollkey iOS
+
+on:
+  push:
+    paths:
+      - "Scrollkey/**"
+      - ".github/workflows/scrollkey-ios.yml"
+  pull_request:
+    paths:
+      - "Scrollkey/**"
+      - ".github/workflows/scrollkey-ios.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: scrollkey-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build & test
+    runs-on: macos-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: Scrollkey
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes available
+
+      - name: Pick an iPhone simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          def version(runtime):
+              return [int(p) for p in runtime.rsplit("iOS-", 1)[1].split("-")]
+          for runtime in sorted((r for r in devices if "iOS-" in r), key=version, reverse=True):
+              for device in devices[runtime]:
+                  if device["name"].startswith("iPhone"):
+                      print(device["udid"], file=sys.stderr, end=" ")
+                      print(device["name"], file=sys.stderr)
+                      print(device["udid"])
+                      sys.exit(0)
+          sys.exit("No iPhone simulator available")
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build for iPhone (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Scrollkey.xcodeproj -scheme Scrollkey \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO -quiet
+
+      - name: Unit + UI tests
+        env:
+          TEST_RUNNER_SCREENSHOT_DIR: ${{ runner.temp }}/screens
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Scrollkey.xcodeproj -scheme Scrollkey \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath "$RUNNER_TEMP/Scrollkey.xcresult" \
+            CODE_SIGNING_ALLOWED=NO -quiet
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrollkey-screenshots
+          path: ${{ runner.temp }}/screens
+          if-no-files-found: ignore
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrollkey-xcresult
+          path: ${{ runner.temp }}/Scrollkey.xcresult
+          if-no-files-found: ignore
+
+      - name: Print screenshots for review
+        if: always()
+        run: |
+          shopt -s nullglob
+          for f in "$RUNNER_TEMP"/screens/*.png; do
+            out="${f%.png}.jpg"
+            sips -Z 640 -s format jpeg -s formatOptions 50 "$f" --out "$out" >/dev/null
+            echo "=== SHOT $(basename "${f%.png}") ==="
+            base64 -i "$out" | fold -w 4000
+            echo "=== END ==="
+          done
