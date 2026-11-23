@@ -11,8 +11,38 @@ struct CompletionView: View {
     @State private var burst = false
     @State private var celebrate = 0
 
-    private let particles: [(angle: Double, distance: Double, delay: Double)] = (0..<12).map { index -> (angle: Double, distance: Double, delay: Double) in
-        (angle: Double(index) / 12 * 2 * Double.pi, distance: Double(110 + (index % 3) * 28), delay: Double(index % 4) * 0.03)
+    private struct Particle {
+        let dx: Double
+        let dy: Double
+        let rotation: Double
+        let delay: Double
+    }
+
+    private static let particles: [Particle] = {
+        var result: [Particle] = []
+        for index in 0..<12 {
+            let angle = Double(index) / 12.0 * 2.0 * Double.pi
+            let distance = 110.0 + Double(index % 3) * 28.0
+            result.append(Particle(
+                dx: cos(angle) * distance,
+                dy: sin(angle) * distance,
+                rotation: -45.0 + Double(index) * 30.0,
+                delay: Double(index % 4) * 0.03
+            ))
+        }
+        return result
+    }()
+
+    private func particleView(_ particle: Particle) -> some View {
+        let x: Double = burst ? particle.dx : 0
+        let y: Double = burst ? particle.dy : 0
+        return Image(systemName: "key.fill")
+            .rotationEffect(.degrees(particle.rotation))
+            .font(.system(size: 16, weight: .bold))
+            .foregroundStyle(Theme.gold)
+            .offset(x: x, y: y)
+            .opacity(burst ? 0 : 1)
+            .animation(.easeOut(duration: 1.1).delay(particle.delay), value: burst)
     }
 
     var body: some View {
@@ -23,18 +53,8 @@ struct CompletionView: View {
             VStack(spacing: 22) {
                 Spacer()
                 ZStack {
-                    ForEach(particles.indices, id: \.self) { index in
-                        let particle = particles[index]
-                        Image(systemName: "key.fill")
-                            .rotationEffect(.degrees(-45 + Double(index) * 30))
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(Theme.gold)
-                            .offset(
-                                x: burst ? cos(particle.angle) * particle.distance : 0,
-                                y: burst ? sin(particle.angle) * particle.distance : 0
-                            )
-                            .opacity(burst ? 0 : 1)
-                            .animation(.easeOut(duration: 1.1).delay(particle.delay), value: burst)
+                    ForEach(Self.particles.indices, id: \.self) { index in
+                        particleView(Self.particles[index])
                     }
                     Circle()
                         .fill(Theme.gold)

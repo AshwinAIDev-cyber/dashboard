@@ -23,10 +23,16 @@ struct StatsView: View {
         let today = calendar.startOfDay(for: .now)
         return (0..<7).reversed().flatMap { offset -> [DayBar] in
             guard let day = calendar.date(byAdding: .day, value: -offset, to: today) else { return [] }
-            let entries = ledger.filter { calendar.isDate($0.date, inSameDayAs: day) }
-            let earned = entries.filter { $0.kind == .earned }.reduce(0) { $0 + $1.amount }
-            let spent = entries.filter { $0.kind == .spent }.reduce(0) { $0 - $1.amount }
-                - entries.filter { $0.kind == .refund }.reduce(0) { $0 + $1.amount }
+            var earned = 0
+            var spent = 0
+            for entry in ledger where calendar.isDate(entry.date, inSameDayAs: day) {
+                switch entry.kind {
+                case .earned: earned += entry.amount
+                case .spent: spent -= entry.amount
+                case .refund: spent -= entry.amount
+                case .bonus: break
+                }
+            }
             return [DayBar(day: day, kind: "Earned", keys: earned), DayBar(day: day, kind: "Spent", keys: max(spent, 0))]
         }
     }
