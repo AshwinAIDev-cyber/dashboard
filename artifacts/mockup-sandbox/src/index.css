@@ -1,0 +1,23 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --color-nexus-cyan: #00c8ff;
+  --color-nexus-violet: #a855f7;
+  --color-nexus-amber: #f59e0b;
+  --color-nexus-green: #00ff6a;
+  --color-nexus-red: #ff3a3a;
+  --color-obsidian-950: #05070d;
+  --color-obsidian-900: #080b14;
+  --color-obsidian-800: #0e1328;
+  --font-sans: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: linear-gradient(180deg, #080b14, #0e1328);
+  color: #e6f6ff;
+  font-family: "Rajdhani", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
